@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Gauge, Pause, RotateCcw, Users, Zap } from "lucide-react";
 import { createGame, type GameApi } from "@/game/engine";
-import type { GameHud, RemoteSnapshot } from "@/game/types";
+import type { GameHud, GameMode, RemoteSnapshot, SpeedPreset } from "@/game/types";
+import { MODE_INFO, SPEED_INFO } from "@/game/scores";
 import type { P2PRoomHandle } from "@/lib/multiplayer/use-p2p-room";
 
 type Props = {
@@ -9,6 +10,8 @@ type Props = {
   room: string;
   joinLabel?: string;
   online: boolean;
+  mode: GameMode;
+  speed: SpeedPreset;
   p2p: P2PRoomHandle | null;
   onExit: () => void;
 };
@@ -23,9 +26,13 @@ const emptyHud: GameHud = {
   paused: false,
   playing: false,
   boosting: false,
+  doubleNitro: false,
+  isHigh: false,
+  mode: "circuit",
+  speedPreset: "sport",
 };
 
-export function GameShell({ name, room, joinLabel, online, p2p, onExit }: Props) {
+export function GameShell({ name, room, joinLabel, online, mode, speed, p2p, onExit }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const apiRef = useRef<GameApi | null>(null);
   const [hud, setHud] = useState<GameHud>(emptyHud);
@@ -35,7 +42,7 @@ export function GameShell({ name, room, joinLabel, online, p2p, onExit }: Props)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const api = createGame(canvas, setHud);
+    const api = createGame(canvas, setHud, { name, mode, speed });
     api.setName(name);
     apiRef.current = api;
     const t = window.setTimeout(() => {
@@ -47,7 +54,7 @@ export function GameShell({ name, room, joinLabel, online, p2p, onExit }: Props)
       api.destroy();
       apiRef.current = null;
     };
-  }, [name]);
+  }, [name, mode, speed]);
 
   useEffect(() => {
     if (!p2p) return;
@@ -94,7 +101,7 @@ export function GameShell({ name, room, joinLabel, online, p2p, onExit }: Props)
 
   return (
     <div className="relative h-dvh w-full overflow-hidden bg-bg text-fg">
-      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full touch-none" />
+      <canvas ref={canvasRef} className="absolute inset-0 block h-full w-full touch-none" />
 
       {!ready && (
         <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-bg">
@@ -136,11 +143,14 @@ export function GameShell({ name, room, joinLabel, online, p2p, onExit }: Props)
             <span className="flex items-center gap-1">
               <Zap className="size-3" /> Nitro
             </span>
-            <span className="font-mono tabular-nums">{hud.nitro}</span>
+            <span className="font-mono tabular-nums">
+              {hud.doubleNitro ? "DOUBLE " : hud.boosting ? "NOS " : ""}
+              {hud.nitro}
+            </span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-elevated">
             <div
-              className={`h-full ${hud.boosting ? "bg-ok" : "bg-accent"}`}
+              className={`h-full ${hud.doubleNitro ? "bg-ice" : hud.boosting ? "bg-flame" : "bg-accent"}`}
               style={{ width: `${hud.nitro}%` }}
             />
           </div>
@@ -150,7 +160,7 @@ export function GameShell({ name, room, joinLabel, online, p2p, onExit }: Props)
       {hud.paused && !hud.crashed && (
         <Overlay
           title="Paused"
-          body="Hold W to accelerate. A / D steer. Shift or E for nitro."
+          body="W gas · A/D steer · tap Shift or E twice for blue double nitro."
           actions={[
             { label: "Resume", onClick: () => apiRef.current?.resume() },
             { label: "Leave", onClick: onExit, ghost: true },
@@ -161,7 +171,7 @@ export function GameShell({ name, room, joinLabel, online, p2p, onExit }: Props)
       {hud.crashed && (
         <Overlay
           title="Crashed"
-          body={`Score ${hud.score} · Best ${hud.best}`}
+          body={`${hud.isHigh ? "NEW HIGH SCORE · " : ""}Score ${hud.score} · Best ${hud.best} · ${MODE_INFO[hud.mode].label} ${SPEED_INFO[hud.speedPreset].label}`}
           actions={[
             { label: "Retry", onClick: () => apiRef.current?.retry(), icon: true },
             { label: "Menu", onClick: onExit, ghost: true },
@@ -171,7 +181,7 @@ export function GameShell({ name, room, joinLabel, online, p2p, onExit }: Props)
 
       <button
         type="button"
-        className="absolute top-[max(1rem,env(safe-area-inset-top))] left-1/2 z-10 hidden -translate-x-1/2 rounded-full bg-surface/80 p-3 text-fg md:flex"
+        className="absolute top-[max(1rem,env(safe-area-inset-top))] left-1/2 z-10 flex -translate-x-1/2 rounded-full bg-surface/80 p-3 text-fg"
         onClick={() => (hud.paused ? apiRef.current?.resume() : apiRef.current?.pause())}
         aria-label="Pause"
       >

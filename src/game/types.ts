@@ -1,3 +1,12 @@
+export type GameMode = "cruise" | "circuit" | "rush" | "survival";
+export type SpeedPreset = "touring" | "sport" | "super" | "insane";
+
+export type GameSettings = {
+  name: string;
+  mode: GameMode;
+  speed: SpeedPreset;
+};
+
 export type GameHud = {
   score: number;
   best: number;
@@ -8,6 +17,10 @@ export type GameHud = {
   paused: boolean;
   playing: boolean;
   boosting: boolean;
+  doubleNitro: boolean;
+  isHigh: boolean;
+  mode: GameMode;
+  speedPreset: SpeedPreset;
 };
 
 export type RemoteSnapshot = {

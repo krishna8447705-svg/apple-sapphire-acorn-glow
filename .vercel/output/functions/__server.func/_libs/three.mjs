@@ -16834,6 +16834,63 @@ var CylinderGeometry = class CylinderGeometry extends BufferGeometry {
 	}
 };
 /**
+* A geometry class for representing a cone.
+*
+* ```js
+* const geometry = new THREE.ConeGeometry( 5, 20, 32 );
+* const material = new THREE.MeshBasicMaterial( { color: 0xffff00 } );
+* const cone = new THREE.Mesh(geometry, material );
+* scene.add( cone );
+* ```
+*
+* @augments CylinderGeometry
+* @demo scenes/geometry-browser.html#ConeGeometry
+*/
+var ConeGeometry = class ConeGeometry extends CylinderGeometry {
+	/**
+	* Constructs a new cone geometry.
+	*
+	* @param {number} [radius=1] - Radius of the cone base.
+	* @param {number} [height=1] - Height of the cone.
+	* @param {number} [radialSegments=32] - Number of segmented faces around the circumference of the cone.
+	* @param {number} [heightSegments=1] - Number of rows of faces along the height of the cone.
+	* @param {boolean} [openEnded=false] - Whether the base of the cone is open or capped.
+	* @param {number} [thetaStart=0] - Start angle for first segment, in radians.
+	* @param {number} [thetaLength=Math.PI*2] - The central angle, often called theta, of the circular sector, in radians.
+	* The default value results in a complete cone.
+	*/
+	constructor(radius = 1, height = 1, radialSegments = 32, heightSegments = 1, openEnded = false, thetaStart = 0, thetaLength = Math.PI * 2) {
+		super(0, radius, height, radialSegments, heightSegments, openEnded, thetaStart, thetaLength);
+		this.type = "ConeGeometry";
+		/**
+		* Holds the constructor parameters that have been
+		* used to generate the geometry. Any modification
+		* after instantiation does not change the geometry.
+		*
+		* @type {Object}
+		*/
+		this.parameters = {
+			radius,
+			height,
+			radialSegments,
+			heightSegments,
+			openEnded,
+			thetaStart,
+			thetaLength
+		};
+	}
+	/**
+	* Factory method for creating an instance of this class from the given
+	* JSON object.
+	*
+	* @param {Object} data - A JSON object representing the serialized geometry.
+	* @return {ConeGeometry} A new instance.
+	*/
+	static fromJSON(data) {
+		return new ConeGeometry(data.radius, data.height, data.radialSegments, data.heightSegments, data.openEnded, data.thetaStart, data.thetaLength);
+	}
+};
+/**
 * A geometry class for representing a plane.
 *
 * ```js
@@ -16920,6 +16977,211 @@ var PlaneGeometry = class PlaneGeometry extends BufferGeometry {
 	*/
 	static fromJSON(data) {
 		return new PlaneGeometry(data.width, data.height, data.widthSegments, data.heightSegments);
+	}
+};
+/**
+* A class for generating a sphere geometry.
+*
+* ```js
+* const geometry = new THREE.SphereGeometry( 15, 32, 16 );
+* const material = new THREE.MeshBasicMaterial( { color: 0xffff00 } );
+* const sphere = new THREE.Mesh( geometry, material );
+* scene.add( sphere );
+* ```
+*
+* @augments BufferGeometry
+* @demo scenes/geometry-browser.html#SphereGeometry
+*/
+var SphereGeometry = class SphereGeometry extends BufferGeometry {
+	/**
+	* Constructs a new sphere geometry.
+	*
+	* @param {number} [radius=1] - The sphere radius.
+	* @param {number} [widthSegments=32] - The number of horizontal segments. Minimum value is `3`.
+	* @param {number} [heightSegments=16] - The number of vertical segments. Minimum value is `2`.
+	* @param {number} [phiStart=0] - The horizontal starting angle in radians.
+	* @param {number} [phiLength=Math.PI*2] - The horizontal sweep angle size.
+	* @param {number} [thetaStart=0] - The vertical starting angle in radians.
+	* @param {number} [thetaLength=Math.PI] - The vertical sweep angle size.
+	*/
+	constructor(radius = 1, widthSegments = 32, heightSegments = 16, phiStart = 0, phiLength = Math.PI * 2, thetaStart = 0, thetaLength = Math.PI) {
+		super();
+		this.type = "SphereGeometry";
+		/**
+		* Holds the constructor parameters that have been
+		* used to generate the geometry. Any modification
+		* after instantiation does not change the geometry.
+		*
+		* @type {Object}
+		*/
+		this.parameters = {
+			radius,
+			widthSegments,
+			heightSegments,
+			phiStart,
+			phiLength,
+			thetaStart,
+			thetaLength
+		};
+		widthSegments = Math.max(3, Math.floor(widthSegments));
+		heightSegments = Math.max(2, Math.floor(heightSegments));
+		const thetaEnd = Math.min(thetaStart + thetaLength, Math.PI);
+		let index = 0;
+		const grid = [];
+		const vertex = new Vector3();
+		const normal = new Vector3();
+		const indices = [];
+		const vertices = [];
+		const normals = [];
+		const uvs = [];
+		for (let iy = 0; iy <= heightSegments; iy++) {
+			const verticesRow = [];
+			const v = iy / heightSegments;
+			const theta = thetaStart + v * thetaLength;
+			const y = radius * Math.cos(theta);
+			const ringRadius = Math.sqrt(radius * radius - y * y);
+			let uOffset = 0;
+			if (iy === 0 && thetaStart === 0) uOffset = .5 / widthSegments;
+			else if (iy === heightSegments && thetaEnd === Math.PI) uOffset = -.5 / widthSegments;
+			for (let ix = 0; ix <= widthSegments; ix++) {
+				const u = ix / widthSegments;
+				const phi = phiStart + u * phiLength;
+				vertex.x = -ringRadius * Math.cos(phi);
+				vertex.y = y;
+				vertex.z = ringRadius * Math.sin(phi);
+				vertices.push(vertex.x, vertex.y, vertex.z);
+				normal.copy(vertex).normalize();
+				normals.push(normal.x, normal.y, normal.z);
+				uvs.push(u + uOffset, 1 - v);
+				verticesRow.push(index++);
+			}
+			grid.push(verticesRow);
+		}
+		for (let iy = 0; iy < heightSegments; iy++) for (let ix = 0; ix < widthSegments; ix++) {
+			const a = grid[iy][ix + 1];
+			const b = grid[iy][ix];
+			const c = grid[iy + 1][ix];
+			const d = grid[iy + 1][ix + 1];
+			if (iy !== 0 || thetaStart > 0) indices.push(a, b, d);
+			if (iy !== heightSegments - 1 || thetaEnd < Math.PI) indices.push(b, c, d);
+		}
+		this.setIndex(indices);
+		this.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+		this.setAttribute("normal", new Float32BufferAttribute(normals, 3));
+		this.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
+	}
+	copy(source) {
+		super.copy(source);
+		this.parameters = Object.assign({}, source.parameters);
+		return this;
+	}
+	/**
+	* Factory method for creating an instance of this class from the given
+	* JSON object.
+	*
+	* @param {Object} data - A JSON object representing the serialized geometry.
+	* @return {SphereGeometry} A new instance.
+	*/
+	static fromJSON(data) {
+		return new SphereGeometry(data.radius, data.widthSegments, data.heightSegments, data.phiStart, data.phiLength, data.thetaStart, data.thetaLength);
+	}
+};
+/**
+* A geometry class for representing an torus.
+*
+* ```js
+* const geometry = new THREE.TorusGeometry( 10, 3, 16, 100 );
+* const material = new THREE.MeshBasicMaterial( { color: 0xffff00 } );
+* const torus = new THREE.Mesh( geometry, material );
+* scene.add( torus );
+* ```
+*
+* @augments BufferGeometry
+* @demo scenes/geometry-browser.html#TorusGeometry
+*/
+var TorusGeometry = class TorusGeometry extends BufferGeometry {
+	/**
+	* Constructs a new torus geometry.
+	*
+	* @param {number} [radius=1] - Radius of the torus, from the center of the torus to the center of the tube.
+	* @param {number} [tube=0.4] - Radius of the tube. Must be smaller than `radius`.
+	* @param {number} [radialSegments=12] - The number of radial segments.
+	* @param {number} [tubularSegments=48] - The number of tubular segments.
+	* @param {number} [arc=Math.PI*2] - Central angle in radians.
+	* @param {number} [thetaStart=0] - Start of the tubular sweep in radians.
+	* @param {number} [thetaLength=Math.PI*2] - Length of the tubular sweep in radians.
+	*/
+	constructor(radius = 1, tube = .4, radialSegments = 12, tubularSegments = 48, arc = Math.PI * 2, thetaStart = 0, thetaLength = Math.PI * 2) {
+		super();
+		this.type = "TorusGeometry";
+		/**
+		* Holds the constructor parameters that have been
+		* used to generate the geometry. Any modification
+		* after instantiation does not change the geometry.
+		*
+		* @type {Object}
+		*/
+		this.parameters = {
+			radius,
+			tube,
+			radialSegments,
+			tubularSegments,
+			arc,
+			thetaStart,
+			thetaLength
+		};
+		radialSegments = Math.floor(radialSegments);
+		tubularSegments = Math.floor(tubularSegments);
+		const indices = [];
+		const vertices = [];
+		const normals = [];
+		const uvs = [];
+		const center = new Vector3();
+		const vertex = new Vector3();
+		const normal = new Vector3();
+		for (let j = 0; j <= radialSegments; j++) {
+			const v = thetaStart + j / radialSegments * thetaLength;
+			for (let i = 0; i <= tubularSegments; i++) {
+				const u = i / tubularSegments * arc;
+				vertex.x = (radius + tube * Math.cos(v)) * Math.cos(u);
+				vertex.y = (radius + tube * Math.cos(v)) * Math.sin(u);
+				vertex.z = tube * Math.sin(v);
+				vertices.push(vertex.x, vertex.y, vertex.z);
+				center.x = radius * Math.cos(u);
+				center.y = radius * Math.sin(u);
+				normal.subVectors(vertex, center).normalize();
+				normals.push(normal.x, normal.y, normal.z);
+				uvs.push(i / tubularSegments);
+				uvs.push(j / radialSegments);
+			}
+		}
+		for (let j = 1; j <= radialSegments; j++) for (let i = 1; i <= tubularSegments; i++) {
+			const a = (tubularSegments + 1) * j + i - 1;
+			const b = (tubularSegments + 1) * (j - 1) + i - 1;
+			const c = (tubularSegments + 1) * (j - 1) + i;
+			const d = (tubularSegments + 1) * j + i;
+			indices.push(a, b, d);
+			indices.push(b, c, d);
+		}
+		this.setIndex(indices);
+		this.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+		this.setAttribute("normal", new Float32BufferAttribute(normals, 3));
+		this.setAttribute("uv", new Float32BufferAttribute(uvs, 2));
+	}
+	copy(source) {
+		super.copy(source);
+		this.parameters = Object.assign({}, source.parameters);
+		return this;
+	}
+	/**
+	* Factory method for creating an instance of this class from the given
+	* JSON object.
+	*
+	* @param {Object} data - A JSON object representing the serialized geometry.
+	* @return {TorusGeometry} A new instance.
+	*/
+	static fromJSON(data) {
+		return new TorusGeometry(data.radius, data.tube, data.radialSegments, data.tubularSegments, data.arc, data.thetaStart, data.thetaLength);
 	}
 };
 /**
@@ -20175,220 +20437,6 @@ var PerspectiveCamera = class extends Camera {
 		if (this.view !== null) data.object.view = Object.assign({}, this.view);
 		data.object.filmGauge = this.filmGauge;
 		data.object.filmOffset = this.filmOffset;
-		return data;
-	}
-};
-/**
-* Represents the shadow configuration of directional lights.
-*
-* @augments LightShadow
-*/
-var SpotLightShadow = class extends LightShadow {
-	/**
-	* Constructs a new spot light shadow.
-	*/
-	constructor() {
-		super(new PerspectiveCamera(50, 1, .5, 500));
-		/**
-		* This flag can be used for type testing.
-		*
-		* @type {boolean}
-		* @readonly
-		* @default true
-		*/
-		this.isSpotLightShadow = true;
-		/**
-		* Used to focus the shadow camera. The camera's field of view is set as a
-		* percentage of the spotlight's field-of-view. Range is `[0, 1]`.
-		*
-		* @type {number}
-		* @default 1
-		*/
-		this.focus = 1;
-		/**
-		* Texture aspect ratio.
-		*
-		* @type {number}
-		* @default 1
-		*/
-		this.aspect = 1;
-	}
-	updateMatrices(light) {
-		const camera = this.camera;
-		const fov = RAD2DEG * 2 * light.angle * this.focus;
-		const aspect = this.mapSize.width / this.mapSize.height * this.aspect;
-		const far = light.distance || camera.far;
-		if (fov !== camera.fov || aspect !== camera.aspect || far !== camera.far) {
-			camera.fov = fov;
-			camera.aspect = aspect;
-			camera.far = far;
-			camera.updateProjectionMatrix();
-		}
-		super.updateMatrices(light);
-	}
-	copy(source) {
-		super.copy(source);
-		this.focus = source.focus;
-		this.aspect = source.aspect;
-		return this;
-	}
-	/**
-	* Serializes the light shadow into JSON.
-	*
-	* @return {Object} A JSON object representing the serialized light shadow.
-	* @see {@link ObjectLoader#parse}
-	*/
-	toJSON() {
-		const object = super.toJSON();
-		object.focus = this.focus;
-		object.aspect = this.aspect;
-		return object;
-	}
-};
-/**
-* This light gets emitted from a single point in one direction, along a cone
-* that increases in size the further from the light it gets.
-*
-* This light can cast shadows - see the {@link SpotLightShadow} for details.
-*
-* ```js
-* // white spotlight shining from the side, modulated by a texture
-* const spotLight = new THREE.SpotLight( 0xffffff );
-* spotLight.position.set( 100, 1000, 100 );
-* spotLight.map = new THREE.TextureLoader().load( url );
-*
-* spotLight.castShadow = true;
-* spotLight.shadow.mapSize.width = 1024;
-* spotLight.shadow.mapSize.height = 1024;
-* spotLight.shadow.camera.near = 500;
-* spotLight.shadow.camera.far = 4000;
-* spotLight.shadow.camera.fov = 30;s
-* ```
-*
-* @augments Light
-*/
-var SpotLight = class extends Light {
-	/**
-	* Constructs a new spot light.
-	*
-	* @param {(number|Color|string)} [color=0xffffff] - The light's color.
-	* @param {number} [intensity=1] - The light's strength/intensity measured in candela (cd).
-	* @param {number} [distance=0] - Maximum range of the light. `0` means no limit.
-	* @param {number} [angle=Math.PI/3] - Maximum angle of light dispersion from its direction whose upper bound is `Math.PI/2`.
-	* @param {number} [penumbra=0] - Percent of the spotlight cone that is attenuated due to penumbra. Value range is `[0,1]`.
-	* @param {number} [decay=2] - The amount the light dims along the distance of the light.
-	*/
-	constructor(color, intensity, distance = 0, angle = Math.PI / 3, penumbra = 0, decay = 2) {
-		super(color, intensity);
-		/**
-		* This flag can be used for type testing.
-		*
-		* @type {boolean}
-		* @readonly
-		* @default true
-		*/
-		this.isSpotLight = true;
-		this.type = "SpotLight";
-		this.position.copy(Object3D.DEFAULT_UP);
-		this.updateMatrix();
-		/**
-		* The spot light points from its position to the
-		* target's position.
-		*
-		* For the target's position to be changed to anything other
-		* than the default, it must be added to the scene.
-		*
-		* It is also possible to set the target to be another 3D object
-		* in the scene. The light will now track the target object.
-		*
-		* @type {Object3D}
-		*/
-		this.target = new Object3D();
-		/**
-		* Maximum range of the light. `0` means no limit.
-		*
-		* @type {number}
-		* @default 0
-		*/
-		this.distance = distance;
-		/**
-		* Maximum angle of light dispersion from its direction whose upper bound is `Math.PI/2`.
-		*
-		* @type {number}
-		* @default Math.PI/3
-		*/
-		this.angle = angle;
-		/**
-		* Percent of the spotlight cone that is attenuated due to penumbra.
-		* Value range is `[0,1]`.
-		*
-		* @type {number}
-		* @default 0
-		*/
-		this.penumbra = penumbra;
-		/**
-		* The amount the light dims along the distance of the light. In context of
-		* physically-correct rendering the default value should not be changed.
-		*
-		* @type {number}
-		* @default 2
-		*/
-		this.decay = decay;
-		/**
-		* A texture used to modulate the color of the light. The spot light
-		* color is mixed with the RGB value of this texture, with a ratio
-		* corresponding to its alpha value. The cookie-like masking effect is
-		* reproduced using pixel values (0, 0, 0, 1-cookie_value).
-		*
-		* *Warning*: This property is disabled if {@link Object3D#castShadow} is set to `false`.
-		*
-		* @type {?Texture}
-		* @default null
-		*/
-		this.map = null;
-		/**
-		* This property holds the light's shadow configuration.
-		*
-		* @type {SpotLightShadow}
-		*/
-		this.shadow = new SpotLightShadow();
-	}
-	/**
-	* The light's power. Power is the luminous power of the light measured in lumens (lm).
-	*  Changing the power will also change the light's intensity.
-	*
-	* @type {number}
-	*/
-	get power() {
-		return this.intensity * Math.PI;
-	}
-	set power(power) {
-		this.intensity = power / Math.PI;
-	}
-	dispose() {
-		super.dispose();
-		this.shadow.dispose();
-	}
-	copy(source, recursive) {
-		super.copy(source, recursive);
-		this.distance = source.distance;
-		this.angle = source.angle;
-		this.penumbra = source.penumbra;
-		this.decay = source.decay;
-		this.target = source.target.clone();
-		this.map = source.map;
-		this.shadow = source.shadow.clone();
-		return this;
-	}
-	toJSON(meta) {
-		const data = super.toJSON(meta);
-		data.object.distance = this.distance;
-		data.object.angle = this.angle;
-		data.object.decay = this.decay;
-		data.object.penumbra = this.penumbra;
-		data.object.target = this.target.uuid;
-		if (this.map && this.map.isTexture) data.object.map = this.map.toJSON(meta).uuid;
-		data.object.shadow = this.shadow.toJSON();
 		return data;
 	}
 };
@@ -32510,4 +32558,4 @@ var WebGLRenderer = class {
 	}
 };
 //#endregion
-export { SpriteMaterial as C, Sprite as S, PointLight as _, CylinderGeometry as a, Scene as b, Group as c, Mesh as d, MeshBasicMaterial as f, PlaneGeometry as g, PerspectiveCamera as h, Color as i, HemisphereLight as l, Object3D as m, BoxGeometry as n, DirectionalLight as o, MeshStandardMaterial as p, CanvasTexture as r, Fog as s, WebGLRenderer as t, InstancedMesh as u, RepeatWrapping as v, Vector3 as w, SpotLight as x, SRGBColorSpace as y };
+export { ShaderMaterial as C, TorusGeometry as D, SpriteMaterial as E, Vector3 as O, Scene as S, Sprite as T, Object3D as _, CanvasTexture as a, RepeatWrapping as b, ConeGeometry as c, Fog as d, Group as f, MeshStandardMaterial as g, Mesh as h, BufferGeometry as i, CylinderGeometry as l, InstancedMesh as m, BoxGeometry as n, ClampToEdgeWrapping as o, HemisphereLight as p, BufferAttribute as r, Color as s, WebGLRenderer as t, DirectionalLight as u, PerspectiveCamera as v, SphereGeometry as w, SRGBColorSpace as x, PointLight as y };
